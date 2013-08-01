@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
 	"io"
-	"os"
+	// "os"
 	"strings"
 	"unicode"
 )
@@ -37,6 +37,11 @@ func (this List) String() string {
 		return strings.Join([]string{"(", scar, " . ", scdr, ")"}, "")
 	}
 }
+
+var (
+	NIL = Atom{"nil"}
+	TEE = Atom{"t"}
+)
 
 // like in.ReadRune() but ignore all leading whitespace.
 func ReadChar(in io.RuneScanner) (r rune, size int, err error) {
@@ -71,7 +76,9 @@ func ReadList(in io.RuneScanner) Sexper {
 
 	switch chstr {
 	case ")":
-		return Atom{"nil"}
+		return NIL
+	case ".":
+		return ReadAtom(in)
 	default:
 		in.UnreadRune()
 		scar := ReadSexp(in)
@@ -86,6 +93,8 @@ func ReadSexp(in io.RuneScanner) Sexper {
 	switch string(ch) {
 	case "(":
 		return ReadList(in)
+	case "'":
+		return fn_list(Atom{"quote"}, ReadSexp(in))
 	case ")":
 		panic("unexcepted ')' found")
 	default:
@@ -94,8 +103,58 @@ func ReadSexp(in io.RuneScanner) Sexper {
 	}
 }
 
+func ReadFrom(str string) Sexper {
+	return ReadSexp(strings.NewReader(str))
+}
+
+// seven basic functions
+func fn_quote(sexp Sexper) Sexper {
+	return sexp
+}
+
+func fn_atom(sexp Sexper) Sexper {
+	if sexp.Atomp() {
+		return TEE
+	} else {
+		return NIL
+	}
+}
+
+func fn_eq(s1, s2 Sexper) Sexper {
+	if s1 == s2 {
+		return TEE
+	} else {
+		return NIL
+	}
+}
+
+func fn_car(sexp Sexper) Sexper {
+	return sexp.(List).car
+}
+
+func fn_cdr(sexp Sexper) Sexper {
+	return sexp.(List).cdr
+}
+
+func fn_cons(s1, s2 Sexper) Sexper {
+	return List{s1, s2}
+}
+
+func fn_list(s1, s2 Sexper) Sexper {
+	return List{s1, List{s2, NIL}}
+}
+
+func fn_cond(ss ...Sexper) Sexper {
+	for _, list := range ss {
+		if fn_car(list) != NIL {
+			return fn_car(fn_cdr(list))
+		}
+	}
+	return NIL
+}
+
 func main() {
-	atomn := Atom{"nil"}
+	atomn := NIL
 	atom1 := Atom{"atom1"}
 	atom2 := Atom{"atom2"}
 	atom3 := Atom{"atom3"}
@@ -104,9 +163,12 @@ func main() {
 	list3 := List{Sexper(&list1), Sexper(&list2)}
 	list4 := List{Sexper(&list2), Sexper(&list3)}
 	fmt.Println(list1, list2, list3, list4)
-	in := bufio.NewReader(os.Stdin)
-	for {
-		sexp := ReadSexp(in)
-		fmt.Println("==================== sexp:", sexp)
-	}
+	hello_world := ReadFrom("'(hello . world)")
+	fmt.Println(hello_world, fn_car(hello_world), fn_cdr(hello_world))
+	fmt.Println(fn_cons(Atom{"hello"}, fn_cons(Atom{"emacs"}, NIL)))
+
+	// env := List{fn_cons(Atom{"hello"}, Atom{"world"}), NIL}
+	// fmt.Println(env.Get(Atom{"hello"}))
+	// fmt.Println(env.Set(Atom{"os"}, Atom{"mac"}))
+	// fmt.Println(env.Set(Atom{"os"}, Atom{"mac"}).Get(Atom{"os"}))
 }
