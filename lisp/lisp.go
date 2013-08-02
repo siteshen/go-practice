@@ -1,10 +1,7 @@
-package main
+package lisp
 
 import (
-	"bufio"
-	"fmt"
 	"io"
-	"os"
 	"strings"
 	"unicode"
 )
@@ -241,16 +238,4 @@ func InitEnv() List {
 	GlobalEnv = GlobalEnv.Set(Atom{"who"}, Atom{"siteshen"})
 	GlobalEnv = GlobalEnv.Set(Atom{"editor"}, Atom{"emacs"})
 	return GlobalEnv
-}
-
-func main() {
-	env := InitEnv()
-	in := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Print("> ")
-		sexp := ReadSexp(in)
-		fmt.Println("    read:", sexp)
-		eval := env.Eval(sexp)
-		fmt.Println("    eval:", eval)
-	}
 }
