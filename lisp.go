@@ -41,6 +41,19 @@ func (this List) String() string {
 var (
 	NIL = Atom{"nil"}
 	TEE = Atom{"t"}
+
+	QUOTE = Atom{"quote"}
+	ATOM  = Atom{"atom"}
+	EQ    = Atom{"eq"}
+	CAR   = Atom{"car"}
+	CDR   = Atom{"cdr"}
+	CONS  = Atom{"cons"}
+	COND  = Atom{"cond"}
+)
+
+var (
+	ERROR_EOF = `End of file during parsing`
+	ERROR_DOT = `Invalid read syntax: ". in wrong context"`
 )
 
 // like in.ReadRune() but ignore all leading whitespace.
@@ -54,15 +67,21 @@ func ReadChar(in io.RuneScanner) (r rune, size int, err error) {
 
 // sexp reader
 func ReadAtom(in io.RuneScanner) Sexper {
-	ch, _, _ := ReadChar(in)
+	ch, _, err := ReadChar(in)
 	chstr := string(ch)
+	if err == io.EOF {
+		panic(ERROR_EOF)
+	}
 
 	buffer := make([]rune, 128)
 	var i int
-	for i = 0; !unicode.IsSpace(ch) && chstr != "(" && chstr != ")"; i++ {
+	for i = 0; !unicode.IsSpace(ch) && err == nil && chstr != "(" && chstr != ")"; i++ {
 		buffer[i] = ch
-		ch, _, _ = in.ReadRune()
+		ch, _, err = in.ReadRune()
 		chstr = string(ch)
+	}
+	if err != nil && err != io.EOF {
+		panic(err)
 	}
 	if chstr == "(" || chstr == ")" {
 		in.UnreadRune()
@@ -78,7 +97,11 @@ func ReadList(in io.RuneScanner) Sexper {
 	case ")":
 		return NIL
 	case ".":
-		return ReadAtom(in)
+		list := ReadList(in)
+		if list == NIL || fn_cdr(list) != NIL {
+			panic(ERROR_DOT)
+		}
+		return fn_car(list)
 	default:
 		in.UnreadRune()
 		scar := ReadSexp(in)
@@ -153,6 +176,68 @@ func fn_cond(ss ...Sexper) Sexper {
 	return NIL
 }
 
+type Evaler interface {
+	Get(Sexper) Sexper
+	Set(Sexper, Sexper) Evaler
+	Eval(Sexper) Sexper
+}
+
+// List is an Evaler
+func (this List) Get(key Sexper) Sexper {
+	if key == NIL || key == TEE {
+		return key
+	}
+
+	for list := Sexper(this); list != NIL; list = fn_cdr(list) {
+		scar := fn_car(list)
+		if fn_eq(fn_car(scar), key) == TEE {
+			return fn_cdr(scar)
+		}
+	}
+	return NIL
+}
+
+func (this List) Set(key, val Sexper) List {
+	return fn_cons(fn_cons(key, val), this).(List)
+}
+
+func (this List) Eval(sexp Sexper) Sexper {
+	switch {
+	case fn_atom(sexp) == TEE:
+		return this.Get(sexp)
+	case fn_atom(fn_car(sexp)) == TEE:
+		fn := fn_car(sexp)
+		switch {
+		case fn_eq(fn, QUOTE) == TEE:
+			return fn_car(fn_cdr(sexp))
+		case fn_eq(fn, ATOM) == TEE:
+			return fn_atom(this.Eval(fn_car(fn_cdr(sexp))))
+		case fn_eq(fn, EQ) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_eq(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, CAR) == TEE:
+			return fn_car(this.Eval(fn_car(fn_cdr(sexp))))
+		case fn_eq(fn, CDR) == TEE:
+			return fn_cdr(this.Eval(fn_car(fn_cdr(sexp))))
+		case fn_eq(fn, CONS) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_cons(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, COND) == TEE:
+			for list := fn_cdr(sexp); list != NIL; list = fn_cdr(list) {
+				cond := fn_car(list)
+				if this.Eval(fn_car(cond)) != NIL {
+					return this.Eval(fn_car(fn_cdr(cond)))
+				}
+			}
+			return NIL
+		default:
+			return NIL
+		}
+	default:
+		return NIL
+	}
+}
+
 func main() {
 	atomn := NIL
 	atom1 := Atom{"atom1"}
@@ -163,12 +248,34 @@ func main() {
 	list3 := List{Sexper(&list1), Sexper(&list2)}
 	list4 := List{Sexper(&list2), Sexper(&list3)}
 	fmt.Println(list1, list2, list3, list4)
-	hello_world := ReadFrom("'(hello . world)")
+	hello_world := ReadFrom("(hello)")
 	fmt.Println(hello_world, fn_car(hello_world), fn_cdr(hello_world))
 	fmt.Println(fn_cons(Atom{"hello"}, fn_cons(Atom{"emacs"}, NIL)))
 
-	// env := List{fn_cons(Atom{"hello"}, Atom{"world"}), NIL}
-	// fmt.Println(env.Get(Atom{"hello"}))
-	// fmt.Println(env.Set(Atom{"os"}, Atom{"mac"}))
-	// fmt.Println(env.Set(Atom{"os"}, Atom{"mac"}).Get(Atom{"os"}))
+	env := List{List{Atom{"os"}, Atom{"mac"}}, NIL}
+	env = env.Set(Atom{"who"}, Atom{"siteshen"})
+	env = env.Set(Atom{"editor"}, Atom{"emacs"})
+	fmt.Println(env)
+	fmt.Println(env.Eval(ReadFrom("'(cons 'a nil)")))
+	fmt.Println(env.Eval(ReadFrom("(cons 'a nil)")))
+	fmt.Println(env.Eval(ReadFrom("(cdr (cons 'a nil))")))
+	fmt.Println(env.Eval(ReadFrom("(quote (cons 'a 'b))")))
+	fmt.Println(env.Eval(ReadFrom("(eq 'nil nil)")))
+	fmt.Println(env.Eval(ReadFrom("(eq t 't)")))
+	fmt.Println(env.Eval(ReadFrom("(eq (cons (quote a) (quote b)) (quote (a . b)))")))
+	fmt.Println(env.Eval(ReadFrom(`(eq 'b 'b)`)))
+	fmt.Println(env.Eval(ReadFrom(`(eq 'a 'b)`)))
+	fmt.Println(env.Eval(ReadFrom(`(eq os 'mac)`)))
+	fmt.Println(env.Eval(ReadFrom(`(eq who who)`)))
+
+	fmt.Println(env.Eval(ReadFrom(
+		`(cond ((eq 'a 'b) 'error)
+           ((eq 'b 'b) 'works))`,
+	)))
+
+	fmt.Println(env.Eval(ReadFrom(
+		`(cond ((eq (cons 'a 'b) '(a . b)) 'works)
+           ('t 'error))`,
+	)))
+
 }
