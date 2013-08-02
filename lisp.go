@@ -1,10 +1,10 @@
 package main
 
 import (
-	// "bufio"
+	"bufio"
 	"fmt"
 	"io"
-	// "os"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -117,7 +117,7 @@ func ReadSexp(in io.RuneScanner) Sexper {
 	case "(":
 		return ReadList(in)
 	case "'":
-		return fn_list(Atom{"quote"}, ReadSexp(in))
+		return fn_cons(Atom{"quote"}, fn_cons(ReadSexp(in), NIL))
 	case ")":
 		panic("unexcepted ')' found")
 	default:
@@ -161,10 +161,6 @@ func fn_cdr(sexp Sexper) Sexper {
 
 func fn_cons(s1, s2 Sexper) Sexper {
 	return List{s1, s2}
-}
-
-func fn_list(s1, s2 Sexper) Sexper {
-	return List{s1, List{s2, NIL}}
 }
 
 func fn_cond(ss ...Sexper) Sexper {
@@ -238,44 +234,23 @@ func (this List) Eval(sexp Sexper) Sexper {
 	}
 }
 
+var GlobalEnv = fn_cons(fn_cons(Atom{"os"}, Atom{"mac"}), NIL).(List)
+
+func InitEnv() List {
+	GlobalEnv = GlobalEnv.Set(Atom{"os"}, Atom{"mac"})
+	GlobalEnv = GlobalEnv.Set(Atom{"who"}, Atom{"siteshen"})
+	GlobalEnv = GlobalEnv.Set(Atom{"editor"}, Atom{"emacs"})
+	return GlobalEnv
+}
+
 func main() {
-	atomn := NIL
-	atom1 := Atom{"atom1"}
-	atom2 := Atom{"atom2"}
-	atom3 := Atom{"atom3"}
-	list1 := List{Sexper(&atom1), Sexper(&atom2)}
-	list2 := List{Sexper(&atom3), Sexper(&atomn)}
-	list3 := List{Sexper(&list1), Sexper(&list2)}
-	list4 := List{Sexper(&list2), Sexper(&list3)}
-	fmt.Println(list1, list2, list3, list4)
-	hello_world := ReadFrom("(hello)")
-	fmt.Println(hello_world, fn_car(hello_world), fn_cdr(hello_world))
-	fmt.Println(fn_cons(Atom{"hello"}, fn_cons(Atom{"emacs"}, NIL)))
-
-	env := List{List{Atom{"os"}, Atom{"mac"}}, NIL}
-	env = env.Set(Atom{"who"}, Atom{"siteshen"})
-	env = env.Set(Atom{"editor"}, Atom{"emacs"})
-	fmt.Println(env)
-	fmt.Println(env.Eval(ReadFrom("'(cons 'a nil)")))
-	fmt.Println(env.Eval(ReadFrom("(cons 'a nil)")))
-	fmt.Println(env.Eval(ReadFrom("(cdr (cons 'a nil))")))
-	fmt.Println(env.Eval(ReadFrom("(quote (cons 'a 'b))")))
-	fmt.Println(env.Eval(ReadFrom("(eq 'nil nil)")))
-	fmt.Println(env.Eval(ReadFrom("(eq t 't)")))
-	fmt.Println(env.Eval(ReadFrom("(eq (cons (quote a) (quote b)) (quote (a . b)))")))
-	fmt.Println(env.Eval(ReadFrom(`(eq 'b 'b)`)))
-	fmt.Println(env.Eval(ReadFrom(`(eq 'a 'b)`)))
-	fmt.Println(env.Eval(ReadFrom(`(eq os 'mac)`)))
-	fmt.Println(env.Eval(ReadFrom(`(eq who who)`)))
-
-	fmt.Println(env.Eval(ReadFrom(
-		`(cond ((eq 'a 'b) 'error)
-           ((eq 'b 'b) 'works))`,
-	)))
-
-	fmt.Println(env.Eval(ReadFrom(
-		`(cond ((eq (cons 'a 'b) '(a . b)) 'works)
-           ('t 'error))`,
-	)))
-
+	env := InitEnv()
+	in := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("> ")
+		sexp := ReadSexp(in)
+		fmt.Println("    read:", sexp)
+		eval := env.Eval(sexp)
+		fmt.Println("    eval:", eval)
+	}
 }
