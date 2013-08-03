@@ -1,28 +1,52 @@
 package lisp
 
 import (
+	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"unicode"
 )
 
 // Atom, List, Sexper
+type String struct{ val string }
+type Number struct{ val int }
 type Atom struct{ name string }
 type List struct{ car, cdr Sexper }
 type Sexper interface {
+	Numberp() bool
+	Stringp() bool
 	Atomp() bool
 	Listp() bool
 	String() string
 }
 
+// String is a Sexper
+func (this String) Numberp() bool  { return false }
+func (this String) Stringp() bool  { return true }
+func (this String) Atomp() bool    { return true }
+func (this String) Listp() bool    { return false }
+func (this String) String() string { return fmt.Sprintf("%q", this.val) }
+
+// Number is a Sexper
+func (this Number) Numberp() bool  { return true }
+func (this Number) Stringp() bool  { return false }
+func (this Number) Atomp() bool    { return true }
+func (this Number) Listp() bool    { return false }
+func (this Number) String() string { return fmt.Sprintf("%d", this.val) }
+
 // Atom is a Sexper
+func (this Atom) Numberp() bool  { return false }
+func (this Atom) Stringp() bool  { return false }
 func (this Atom) Atomp() bool    { return true }
 func (this Atom) Listp() bool    { return false }
 func (this Atom) String() string { return this.name }
 
 // List is a Sexper
-func (this List) Atomp() bool { return false }
-func (this List) Listp() bool { return true }
+func (this List) Numberp() bool { return false }
+func (this List) Stringp() bool { return false }
+func (this List) Atomp() bool   { return false }
+func (this List) Listp() bool   { return true }
 func (this List) String() string {
 	scar, scdr := this.car.String(), this.cdr.String()
 	switch {
@@ -86,6 +110,53 @@ func ReadAtom(in io.RuneScanner) Sexper {
 	return Atom{string(buffer[0:i])}
 }
 
+func ReadNumber(in io.RuneScanner) Sexper {
+	ch, _, err := ReadChar(in)
+	chstr := string(ch)
+	if err != nil {
+		panic(err)
+	}
+
+	result := 0
+	for unicode.IsDigit(ch) && err == nil && chstr != "(" && chstr != ")" {
+		number, _ := strconv.Atoi(string(ch))
+		result = result*10 + number
+		ch, _, err = in.ReadRune()
+		chstr = string(ch)
+	}
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+	if chstr == "(" || chstr == ")" {
+		in.UnreadRune()
+	}
+	return Number{result}
+}
+
+func ReadString(in io.RuneScanner) Sexper {
+	ch, _, err := ReadChar(in)
+	chstr := string(ch)
+	if err != nil {
+		panic(err)
+	}
+
+	buffer := make([]rune, 128)
+	var i int
+	for i = 0; err == nil && chstr != "\"" && chstr != "(" && chstr != ")"; i++ {
+		buffer[i] = ch
+		ch, _, err = in.ReadRune()
+		chstr = string(ch)
+	}
+	if err != nil && err != io.EOF {
+		panic(err)
+	}
+
+	if err == io.EOF && chstr != "\"" {
+		panic("End of file during parsing")
+	}
+	return String{string(buffer[0:i])}
+}
+
 func ReadList(in io.RuneScanner) Sexper {
 	ch, _, _ := ReadChar(in)
 	chstr := string(ch)
@@ -111,6 +182,8 @@ func ReadSexp(in io.RuneScanner) Sexper {
 	ch, _, _ := ReadChar(in)
 
 	switch string(ch) {
+	case "\"":
+		return ReadString(in)
 	case "(":
 		return ReadList(in)
 	case "'":
@@ -119,7 +192,11 @@ func ReadSexp(in io.RuneScanner) Sexper {
 		panic("unexcepted ')' found")
 	default:
 		in.UnreadRune()
-		return ReadAtom(in)
+		if unicode.IsDigit(ch) {
+			return ReadNumber(in)
+		} else {
+			return ReadAtom(in)
+		}
 	}
 }
 
@@ -177,7 +254,7 @@ type Evaler interface {
 
 // List is an Evaler
 func (this List) Get(key Sexper) Sexper {
-	if key == NIL || key == TEE {
+	if key == NIL || key == TEE || key.Stringp() || key.Numberp() {
 		return key
 	}
 

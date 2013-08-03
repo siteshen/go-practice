@@ -42,6 +42,15 @@ func TestRead(t *testing.T) {
 	atom = ReadFrom("atom")
 	AssertEqual(t, atom, "atom")
 
+	atom = ReadFrom("12345")
+	AssertEqual(t, atom, "12345")
+
+	atom = ReadFrom("012345")
+	AssertEqual(t, atom, "12345")
+
+	atom = ReadFrom(`"hello world"`)
+	AssertEqual(t, atom, `"hello world"`)
+
 	list = ReadFrom("(hello . world)")
 	AssertEqual(t, fn_car(list), "hello")
 	AssertEqual(t, fn_cdr(list), "world")
