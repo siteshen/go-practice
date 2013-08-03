@@ -89,6 +89,19 @@ func TestFunc(t *testing.T) {
 func TestEval(t *testing.T) {
 	env := InitEnv()
 
+	// arithmetic
+	AssertEval(t, env, "(+ 10 3)", "13")
+	AssertEval(t, env, "(- 10 3)", "7")
+	AssertEval(t, env, "(* 10 3)", "30")
+	AssertEval(t, env, "(/ 10 3)", "3")
+	AssertEval(t, env, "(% 10 3)", "1")
+
+	AssertEval(t, env, "(+ 3 10)", "13")
+	AssertEval(t, env, "(- 3 10)", "-7")
+	AssertEval(t, env, "(* 3 10)", "30")
+	AssertEval(t, env, "(/ 3 10)", "0")
+	AssertEval(t, env, "(% 3 10)", "3")
+
 	// atom
 	AssertEval(t, env, "os", "mac")
 	AssertEval(t, env, "nil", "nil")

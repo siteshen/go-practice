@@ -77,6 +77,14 @@ var (
 	ERROR_DOT = `Invalid read syntax: ". in wrong context"`
 )
 
+var (
+	ADD = Atom{"+"}
+	SUB = Atom{"-"}
+	MUL = Atom{"*"}
+	MOD = Atom{"%"}
+	DIV = Atom{"/"}
+)
+
 // like in.ReadRune() but ignore all leading whitespace.
 func ReadChar(in io.RuneScanner) (r rune, size int, err error) {
 	r, size, err = in.ReadRune()
@@ -246,6 +254,28 @@ func fn_cond(ss ...Sexper) Sexper {
 	return NIL
 }
 
+// arithmetic
+func fn_add(x, y Sexper) Sexper {
+	return Number{x.(Number).val + y.(Number).val}
+}
+
+func fn_sub(x, y Sexper) Sexper {
+	return Number{x.(Number).val - y.(Number).val}
+}
+
+func fn_mul(x, y Sexper) Sexper {
+	return Number{x.(Number).val * y.(Number).val}
+}
+
+func fn_div(x, y Sexper) Sexper {
+	return Number{x.(Number).val / y.(Number).val}
+}
+
+func fn_mod(x, y Sexper) Sexper {
+	return Number{x.(Number).val % y.(Number).val}
+}
+
+// Evaler
 type Evaler interface {
 	Get(Sexper) Sexper
 	Set(Sexper, Sexper) Evaler
@@ -278,6 +308,24 @@ func (this List) Eval(sexp Sexper) Sexper {
 	case fn_atom(fn_car(sexp)) == TEE:
 		fn := fn_car(sexp)
 		switch {
+		// add, sub, mul, div, mod
+		case fn_eq(fn, ADD) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_add(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, SUB) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_sub(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, MUL) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_mul(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, DIV) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_div(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+		case fn_eq(fn, MOD) == TEE:
+			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
+			return fn_mod(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
+
+		// quote, atom, eq, car, cdr, cons, cond
 		case fn_eq(fn, QUOTE) == TEE:
 			return fn_car(fn_cdr(sexp))
 		case fn_eq(fn, ATOM) == TEE:
