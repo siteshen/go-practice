@@ -90,6 +90,11 @@ func TestEval(t *testing.T) {
 	env := InitEnv()
 
 	// arithmetic
+	AssertEval(t, env, "(+ 3)", "3")
+	AssertEval(t, env, "(- 3)", "-3")
+	AssertEval(t, env, "(* 3)", "3")
+	AssertEval(t, env, "(/ 3)", "3")
+
 	AssertEval(t, env, "(+ 10 3)", "13")
 	AssertEval(t, env, "(- 10 3)", "7")
 	AssertEval(t, env, "(* 10 3)", "30")
@@ -102,6 +107,12 @@ func TestEval(t *testing.T) {
 	AssertEval(t, env, "(/ 3 10)", "0")
 	AssertEval(t, env, "(% 3 10)", "3")
 
+	AssertEval(t, env, "(+ 10 3 2)", "15")
+	AssertEval(t, env, "(- 10 3 2)", "5")
+	AssertEval(t, env, "(* 10 3 2)", "60")
+	AssertEval(t, env, "(/ 10 3 2)", "1")
+	AssertEval(t, env, "(% 10 3 2)", "1")
+
 	// atom
 	AssertEval(t, env, "os", "mac")
 	AssertEval(t, env, "nil", "nil")
@@ -112,6 +123,7 @@ func TestEval(t *testing.T) {
 	AssertEval(t, env, "(atom '())", "t")
 	AssertEval(t, env, "(atom '(a))", "nil")
 	AssertEval(t, env, "(atom '(nil))", "nil")
+	AssertEval(t, env, "(quote (hello . world))", "(hello . world)")
 
 	// car, cdr, cons
 	AssertEval(t, env, "(cons 'a nil)", "(a)")

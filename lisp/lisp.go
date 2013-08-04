@@ -11,19 +11,24 @@ import (
 // Atom, List, Sexper
 type String struct{ val string }
 type Number struct{ val int }
+type Func struct{ val Callable }
 type Atom struct{ name string }
 type List struct{ car, cdr Sexper }
 type Sexper interface {
 	Numberp() bool
 	Stringp() bool
+	Funcp() bool
 	Atomp() bool
 	Listp() bool
 	String() string
 }
 
+type Callable (func(Sexper) Sexper)
+
 // String is a Sexper
 func (this String) Numberp() bool  { return false }
 func (this String) Stringp() bool  { return true }
+func (this String) Funcp() bool    { return false }
 func (this String) Atomp() bool    { return true }
 func (this String) Listp() bool    { return false }
 func (this String) String() string { return fmt.Sprintf("%q", this.val) }
@@ -31,13 +36,23 @@ func (this String) String() string { return fmt.Sprintf("%q", this.val) }
 // Number is a Sexper
 func (this Number) Numberp() bool  { return true }
 func (this Number) Stringp() bool  { return false }
+func (this Number) Funcp() bool    { return false }
 func (this Number) Atomp() bool    { return true }
 func (this Number) Listp() bool    { return false }
 func (this Number) String() string { return fmt.Sprintf("%d", this.val) }
 
+// Func is a Sexper
+func (this Func) Numberp() bool  { return false }
+func (this Func) Stringp() bool  { return false }
+func (this Func) Funcp() bool    { return true }
+func (this Func) Atomp() bool    { return false }
+func (this Func) Listp() bool    { return false }
+func (this Func) String() string { return fmt.Sprintf("#Callable", this.val) }
+
 // Atom is a Sexper
 func (this Atom) Numberp() bool  { return false }
 func (this Atom) Stringp() bool  { return false }
+func (this Atom) Funcp() bool    { return false }
 func (this Atom) Atomp() bool    { return true }
 func (this Atom) Listp() bool    { return false }
 func (this Atom) String() string { return this.name }
@@ -45,6 +60,7 @@ func (this Atom) String() string { return this.name }
 // List is a Sexper
 func (this List) Numberp() bool { return false }
 func (this List) Stringp() bool { return false }
+func (this List) Funcp() bool   { return false }
 func (this List) Atomp() bool   { return false }
 func (this List) Listp() bool   { return true }
 func (this List) String() string {
@@ -254,25 +270,88 @@ func fn_cond(ss ...Sexper) Sexper {
 	return NIL
 }
 
-// arithmetic
-func fn_add(x, y Sexper) Sexper {
-	return Number{x.(Number).val + y.(Number).val}
+// Callable
+func func_quote(args Sexper) Sexper {
+	return fn_car(args)
 }
 
-func fn_sub(x, y Sexper) Sexper {
-	return Number{x.(Number).val - y.(Number).val}
+func func_atom(args Sexper) Sexper {
+	return fn_atom(GlobalEnv.Eval(fn_car(args)))
 }
 
-func fn_mul(x, y Sexper) Sexper {
-	return Number{x.(Number).val * y.(Number).val}
+func func_eq(args Sexper) Sexper {
+	if GlobalEnv.Eval(fn_car(args)) == GlobalEnv.Eval(fn_car(fn_cdr(args))) {
+		return TEE
+	} else {
+		return NIL
+	}
+}
+func func_car(args Sexper) Sexper {
+	return fn_car(GlobalEnv.Eval(fn_car(args)))
 }
 
-func fn_div(x, y Sexper) Sexper {
-	return Number{x.(Number).val / y.(Number).val}
+func func_cdr(args Sexper) Sexper {
+	return fn_cdr(GlobalEnv.Eval(fn_car(args)))
 }
 
-func fn_mod(x, y Sexper) Sexper {
-	return Number{x.(Number).val % y.(Number).val}
+func func_cons(args Sexper) Sexper {
+	return fn_cons(GlobalEnv.Eval(fn_car(args)),
+		GlobalEnv.Eval(fn_car(fn_cdr(args))))
+}
+
+func func_cond(args Sexper) Sexper {
+	for list := args; list != NIL; list = fn_cdr(list) {
+		if GlobalEnv.Eval(fn_car(fn_car(list))) != NIL {
+			return GlobalEnv.Eval(fn_car(fn_cdr(fn_car(list))))
+		}
+	}
+	return NIL
+}
+
+// Callable arithmetic
+func func_add(args Sexper) Sexper {
+	result := 0
+	for list := args; list != NIL; list = fn_cdr(list) {
+		result += fn_car(list).(Number).val
+	}
+	return Number{result}
+}
+
+func func_sub(args Sexper) Sexper {
+	var result int
+	if args != NIL {
+		result = fn_car(args).(Number).val
+		if fn_cdr(args) == NIL {
+			return Number{-result}
+		}
+	} else {
+		result = 0
+	}
+	for list := fn_cdr(args); list != NIL; list = fn_cdr(list) {
+		result -= fn_car(list).(Number).val
+	}
+	return Number{result}
+}
+
+func func_mul(args Sexper) Sexper {
+	result := 1
+	for list := args; list != NIL; list = fn_cdr(list) {
+		result *= fn_car(list).(Number).val
+	}
+	return Number{result}
+}
+
+func func_div(args Sexper) Sexper {
+	result := fn_car(args).(Number).val
+	for list := fn_cdr(args); list != NIL; list = fn_cdr(list) {
+		result /= fn_car(list).(Number).val
+	}
+	return Number{result}
+}
+
+func func_mod(args Sexper) Sexper {
+	result := fn_car(args).(Number).val % fn_car(fn_cdr(args)).(Number).val
+	return Number{result}
 }
 
 // Evaler
@@ -306,50 +385,11 @@ func (this List) Eval(sexp Sexper) Sexper {
 	case fn_atom(sexp) == TEE:
 		return this.Get(sexp)
 	case fn_atom(fn_car(sexp)) == TEE:
-		fn := fn_car(sexp)
-		switch {
-		// add, sub, mul, div, mod
-		case fn_eq(fn, ADD) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_add(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, SUB) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_sub(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, MUL) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_mul(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, DIV) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_div(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, MOD) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_mod(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-
-		// quote, atom, eq, car, cdr, cons, cond
-		case fn_eq(fn, QUOTE) == TEE:
-			return fn_car(fn_cdr(sexp))
-		case fn_eq(fn, ATOM) == TEE:
-			return fn_atom(this.Eval(fn_car(fn_cdr(sexp))))
-		case fn_eq(fn, EQ) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_eq(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, CAR) == TEE:
-			return fn_car(this.Eval(fn_car(fn_cdr(sexp))))
-		case fn_eq(fn, CDR) == TEE:
-			return fn_cdr(this.Eval(fn_car(fn_cdr(sexp))))
-		case fn_eq(fn, CONS) == TEE:
-			scaddr := fn_car(fn_cdr(fn_cdr(sexp)))
-			return fn_cons(this.Eval(fn_car(fn_cdr(sexp))), this.Eval(scaddr))
-		case fn_eq(fn, COND) == TEE:
-			for list := fn_cdr(sexp); list != NIL; list = fn_cdr(list) {
-				cond := fn_car(list)
-				if this.Eval(fn_car(cond)) != NIL {
-					return this.Eval(fn_car(fn_cdr(cond)))
-				}
-			}
-			return NIL
-		default:
-			return NIL
+		fn := this.Eval(fn_car(sexp))
+		if fn.Funcp() {
+			return fn.(Func).val(fn_cdr(sexp))
+		} else {
+			panic(fmt.Sprintf("Invalid function: %s", fn))
 		}
 	default:
 		return NIL
@@ -362,5 +402,19 @@ func InitEnv() List {
 	GlobalEnv = GlobalEnv.Set(Atom{"os"}, Atom{"mac"})
 	GlobalEnv = GlobalEnv.Set(Atom{"who"}, Atom{"siteshen"})
 	GlobalEnv = GlobalEnv.Set(Atom{"editor"}, Atom{"emacs"})
+
+	GlobalEnv = GlobalEnv.Set(Atom{"quote"}, Func{func_quote})
+	GlobalEnv = GlobalEnv.Set(Atom{"atom"}, Func{func_atom})
+	GlobalEnv = GlobalEnv.Set(Atom{"eq"}, Func{func_eq})
+	GlobalEnv = GlobalEnv.Set(Atom{"car"}, Func{func_car})
+	GlobalEnv = GlobalEnv.Set(Atom{"cdr"}, Func{func_cdr})
+	GlobalEnv = GlobalEnv.Set(Atom{"cons"}, Func{func_cons})
+	GlobalEnv = GlobalEnv.Set(Atom{"cond"}, Func{func_cond})
+
+	GlobalEnv = GlobalEnv.Set(Atom{"+"}, Func{func_add})
+	GlobalEnv = GlobalEnv.Set(Atom{"-"}, Func{func_sub})
+	GlobalEnv = GlobalEnv.Set(Atom{"*"}, Func{func_mul})
+	GlobalEnv = GlobalEnv.Set(Atom{"/"}, Func{func_div})
+	GlobalEnv = GlobalEnv.Set(Atom{"%"}, Func{func_mod})
 	return GlobalEnv
 }
