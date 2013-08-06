@@ -8,13 +8,14 @@ import (
 )
 
 func main() {
-	env := lisp.InitEnv()
+	lisp.InitEnv()
+
 	in := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")
 		sexp := lisp.ReadSexp(in)
 		fmt.Println("    read:", sexp)
-		eval := env.Eval(sexp)
+		eval := lisp.GlobalEnv.Eval(sexp)
 		fmt.Println("    eval:", eval)
 	}
 }

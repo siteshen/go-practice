@@ -87,7 +87,8 @@ func TestFunc(t *testing.T) {
 }
 
 func TestEval(t *testing.T) {
-	env := InitEnv()
+	InitEnv()
+	env := GlobalEnv
 
 	// arithmetic
 	AssertEval(t, env, "(+ 3)", "3")

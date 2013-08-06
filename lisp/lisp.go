@@ -166,7 +166,7 @@ func ReadString(in io.RuneScanner) Sexper {
 
 	buffer := make([]rune, 128)
 	var i int
-	for i = 0; err == nil && chstr != "\"" && chstr != "(" && chstr != ")"; i++ {
+	for i = 0; err == nil && chstr != "\""; i++ {
 		buffer[i] = ch
 		ch, _, err = in.ReadRune()
 		chstr = string(ch)
@@ -308,6 +308,24 @@ func func_cond(args Sexper) Sexper {
 	return NIL
 }
 
+func func_label(args Sexper) Sexper {
+	key := fn_car(args)
+	val := GlobalEnv.Eval(fn_car(fn_cdr(args)))
+	GlobalEnv = GlobalEnv.Set(key, val)
+	return key
+}
+
+func func_eval(args Sexper) Sexper {
+	return GlobalEnv.Eval(GlobalEnv.Eval(fn_car(args)))
+}
+
+func func_read(args Sexper) Sexper {
+	if !fn_car(args).Stringp() {
+		panic("read require a string args")
+	}
+	return ReadFrom(fn_car(args).(String).val)
+}
+
 // Callable arithmetic
 func func_add(args Sexper) Sexper {
 	result := 0
@@ -398,7 +416,7 @@ func (this List) Eval(sexp Sexper) Sexper {
 
 var GlobalEnv = fn_cons(fn_cons(Atom{"os"}, Atom{"mac"}), NIL).(List)
 
-func InitEnv() List {
+func InitEnv() {
 	GlobalEnv = GlobalEnv.Set(Atom{"os"}, Atom{"mac"})
 	GlobalEnv = GlobalEnv.Set(Atom{"who"}, Atom{"siteshen"})
 	GlobalEnv = GlobalEnv.Set(Atom{"editor"}, Atom{"emacs"})
@@ -411,10 +429,13 @@ func InitEnv() List {
 	GlobalEnv = GlobalEnv.Set(Atom{"cons"}, Func{func_cons})
 	GlobalEnv = GlobalEnv.Set(Atom{"cond"}, Func{func_cond})
 
+	GlobalEnv = GlobalEnv.Set(Atom{"label"}, Func{func_label})
+	GlobalEnv = GlobalEnv.Set(Atom{"eval"}, Func{func_eval})
+	GlobalEnv = GlobalEnv.Set(Atom{"read"}, Func{func_read})
+
 	GlobalEnv = GlobalEnv.Set(Atom{"+"}, Func{func_add})
 	GlobalEnv = GlobalEnv.Set(Atom{"-"}, Func{func_sub})
 	GlobalEnv = GlobalEnv.Set(Atom{"*"}, Func{func_mul})
 	GlobalEnv = GlobalEnv.Set(Atom{"/"}, Func{func_div})
 	GlobalEnv = GlobalEnv.Set(Atom{"%"}, Func{func_mod})
-	return GlobalEnv
 }
