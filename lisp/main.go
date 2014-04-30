@@ -1,21 +1,20 @@
-package main
+package lisp
 
 import (
-	"./lisp"
 	"bufio"
 	"fmt"
 	"os"
 )
 
-func main() {
-	lisp.InitEnv()
+func Main() {
+	InitEnv()
 
 	in := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Print("> ")
-		sexp := lisp.ReadSexp(in)
+		sexp := ReadSexp(in)
 		fmt.Println("    read:", sexp)
-		eval := lisp.GlobalEnv.Eval(sexp)
+		eval := GlobalEnv.Eval(sexp)
 		fmt.Println("    eval:", eval)
 	}
 }

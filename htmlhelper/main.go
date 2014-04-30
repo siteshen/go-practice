@@ -1,4 +1,4 @@
-package main
+package htmlhelper
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"./htmlhelper"
 	"code.google.com/p/go.net/html"
 )
 
@@ -21,23 +20,23 @@ func Test(r io.Reader) {
 	node, err := html.Parse(r)
 	checkError(err)
 
-	footer := htmlhelper.GetElementById(node, "x-footer")
-	fmt.Printf("GetElementById: \n%+v\n\n", htmlhelper.Text(footer))
+	footer := GetElementById(node, "x-footer")
+	fmt.Printf("GetElementById: \n%+v\n\n", Text(footer))
 	// html.Render(os.Stdout, footer)
 
-	metas := htmlhelper.GetElementsByName(node, "viewport")
+	metas := GetElementsByName(node, "viewport")
 	for _, elem := range metas {
-		fmt.Printf("GetElementsByName: \n%+v\n", htmlhelper.Html(elem))
+		fmt.Printf("GetElementsByName: \n%+v\n", Html(elem))
 	}
 
-	elems := htmlhelper.GetElementsByClassName(node, "clearfix")
+	elems := GetElementsByClassName(node, "clearfix")
 	for _, elem := range elems {
-		fmt.Printf("GetElementsByClassName: \n%+v\n", htmlhelper.Text(elem))
+		fmt.Printf("GetElementsByClassName: \n%+v\n", Text(elem))
 	}
 
-	elems = htmlhelper.GetElementsByTagName(node, "button")
+	elems = GetElementsByTagName(node, "button")
 	for _, elem := range elems {
-		fmt.Printf("GetElementsByTagName: \n%+v\n", htmlhelper.Html(elem))
+		fmt.Printf("GetElementsByTagName: \n%+v\n", Html(elem))
 	}
 }
 
@@ -65,10 +64,10 @@ func ParseHtml(in io.Reader) {
 	node, err := html.Parse(in)
 	checkError(err)
 
-	fmt.Println(htmlhelper.Html(htmlhelper.GetElementById(node, "x-footer")))
+	fmt.Println(Html(GetElementById(node, "x-footer")))
 }
 
-func main() {
+func Main() {
 	// fetch content
 	// Wget("http://godoc.org/-/subrepo", "sub.html")
 
