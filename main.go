@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"./bookmark"
-	"./htmlhelper"
-	"./lisp"
-	"./tour"
+	"github.com/siteshen/go-practice/bookmark"
+	"github.com/siteshen/go-practice/htmlhelper"
+	"github.com/siteshen/go-practice/lisp"
+	"github.com/siteshen/go-practice/tour"
 )
 
 var AppList = map[string]func(){
