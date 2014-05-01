@@ -7,6 +7,7 @@ import (
 
 	"github.com/siteshen/go-practice/bookmark"
 	"github.com/siteshen/go-practice/htmlhelper"
+	"github.com/siteshen/go-practice/install"
 	"github.com/siteshen/go-practice/lisp"
 	"github.com/siteshen/go-practice/tour"
 )
@@ -16,6 +17,7 @@ var AppList = map[string]func(){
 	"tour":       tour.Main,
 	"bookmark":   bookmark.Main,
 	"htmlhelper": htmlhelper.Main,
+	"htmlhelper": install.Main,
 }
 
 func appNames() (names []string) {
