@@ -17,7 +17,7 @@ var AppList = map[string]func(){
 	"tour":       tour.Main,
 	"bookmark":   bookmark.Main,
 	"htmlhelper": htmlhelper.Main,
-	"htmlhelper": install.Main,
+	"install":    install.Main,
 }
 
 func appNames() (names []string) {

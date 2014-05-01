@@ -78,4 +78,19 @@ func Main() {
 
 	// Test(file)
 	ParseHtml(file)
+
+	// CSS
+	sel1 := SimpleSelector{"ul", "li", "a"}
+	sel2 := SimpleSelector{"tr", "td", "a"}
+
+	role1 := Role{"width", "100px"}
+	role2 := Role{"height", "20px"}
+	css := CSS{
+		Selector: Selector{sel1, sel2},
+		Roles:    []Role{role1, role2},
+	}
+
+	fmt.Println(sel1, role1)
+	fmt.Println(sel2, role2)
+	fmt.Println(css)
 }
