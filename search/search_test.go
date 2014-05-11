@@ -89,7 +89,7 @@ func (s *BinarySearchSuite) TestRandom(c *check.C) {
 		for j := 0; j < 10; j++ {
 			v -= 1
 			c.Check(BinarySearch(s.input, v), check.Equals, s.getFirstLocation(v))
-			c.Check(BinarySearch(s.input, v), check.Equals, s.getFirstLocation(v))
+			c.Check(BinarySearch(s.input, v), check.Equals, s.getLastLocation(v))
 		}
 	}
 }
